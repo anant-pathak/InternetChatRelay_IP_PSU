@@ -1,5 +1,6 @@
 import datetime
 import socket
+import json
 
 server_address = ('localhost', 6789)
 max_size = 10
@@ -13,13 +14,13 @@ max_size = 10
 # client.close()
 
 # TCP:
-clientToSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-clientToSocket.connect(server_address)
+client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+client.connect(server_address)
 customInputStr = ""
-# customInputStr != "Q":
+# while customInputStr != "Q":
 customInputStr = input("Enter message to send to the humble server: ")
-clientToSocket.sendall(customInputStr.encode("utf-8"))
+client.sendall(customInputStr.encode("utf-8"))
 
-data = clientToSocket.recv(max_size)
+data = client.recv(max_size)
 print('At', datetime.datetime.now(), 'someone replied', data)
-clientToSocket.close()
+client.close()

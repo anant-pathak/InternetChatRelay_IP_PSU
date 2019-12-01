@@ -20,25 +20,58 @@ max_size = 4096
 serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 serverSocket.bind(sock_add)
 serverSocket.listen(7)
+serverSocket.setblocking(0)
+inputSockets = []
+outputSockets = []
+
+inputSockets.append(serverSocket)
 
 def myreceive(clientSocket):
     chunks = []
     bytesRcvd = 0
     # while bytesRcvd < max_size:
-    chunk = clientSocket.recv(max_size-bytesRcvd)
-    chunk = chunk.decode("utf-8")
-    if chunk == '':
-        raise RuntimeError("socket connection broken")
-    chunks.append(chunk)
-    bytesRcvd += len(chunk)
+    # while 1:
+    try:
+        chunk = clientSocket.recv(max_size)
+        chunk = chunk.decode("utf-8")
+        if chunk:
+            chunks.append(chunk)
+            bytesRcvd += len(chunk)
+        else:
+            # raise RuntimeError("socket connection broken")
+            print("Socket connection broken, returning FALSE")
+            return False
+    except:
+        print("connection lost, returning FALSE")
+        return False
     return ''.join(chunks)
 
 while 1:
-    (clientSocket, clientAddress) = serverSocket.accept()
-    clientMsg = myreceive(clientSocket)
-    print("client: ", clientSocket, "said: ", clientMsg)
-    clientSocket.sendall("your message received")
-    clientSocket.close()
+    readable, writable, exceptional = select.select(inputSockets, outputSockets, inputSockets, 0.3) #3 seconds
+
+    for s in readable:
+        if s == serverSocket:
+            (clientSocket, clientAddress) = serverSocket.accept()
+            clientSocket.setblocking(0)
+            inputSockets.append(clientSocket)
+        else: # the socket in readable is a client socket having sent some data.
+            clientMsg = myreceive(s)
+            if clientMsg:
+                print("client: ", clientSocket, "said: ", clientMsg)
+                s.sendall(b"your message received")
+            else:
+                inputSockets.remove(s)
+                s.close()
+            # inputSockets.remove(s)
+            # s.close()
+    for w in writable:
+        print("in writable::: for ", w)
+
+    for e in exceptional:
+        inputSockets.remove(e)
+        e.close()
+
+
 
 
 
