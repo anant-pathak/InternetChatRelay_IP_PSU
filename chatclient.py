@@ -6,6 +6,7 @@ import socket
 import sys
 import json
 import select
+from Message import MessageType
 import Message
 
 length_header = 100
@@ -14,6 +15,7 @@ port =  50000  #int(sys.argv[2])
 inputSocket = []
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((host, port))
+username = ""
 # if len(sys.argv) < 4:
 #     print("USAGE: echo_client_sockets.py <HOST> <PORT> <MESSAGE>")
 #     sys.exit(0)
@@ -28,7 +30,7 @@ def client_console(s):
             3: "Join a room",
             4: "Leave a room",
             5: "List all members of a room",
-            6: "Open and participate in a room(send message)",
+            6: "Open and participate in rooms(send message)",
             7: "Log out",
         }
         for eachChoice in user_choices:
@@ -41,63 +43,49 @@ def client_console(s):
 
 def create_a_room():
     chatRoomId = input("Enter chat room id")
-    msgObj = Message(Message.MessageType.CreateRoom, s, chatRoomId, engMessage )
+    chatRoomId = chatRoomId.strip()
+    msgObj = Message(Message.MessageType.CreateRoom, s, chatRoomId, engMessage)
+    encode_send_message(msgObj)
 
-def send_receive_chatRoomM():
-    while running:
+def send_receive_messages():
+    while True:
         inputready, outputready, exceptready = select.select(inputs, outputs, inputs, 0.1)
-        # print(inputready)
-
         for s in inputready:
-            # if s == :
-            #     # handle the server socket
-            #     client, address = self.server.accept()
-            #     client.setblocking(0)
-            #     self.inputs.append(client)
-            #     self.outputs.append(client)
-            #     self.client_queues[client] = queue.Queue()
-            #     # we could make it so that the first thing the server expects is message containing a username
-            #     # which would be a special message type
-            #     print(f"Established connection with: {address}")
-            pass
-        if s == sys.stdin:
-            # any input closes the serves. Does not work on Windows!
-            engMessage = sys.stdin.readline()
-            chatRoomId = input("Input Chat Room ID: ")
-            msgObj = Message(Message.MessageType.SendMsgRoom, s, chatRoomId, engMessage )
-            encode_send_message(msgObj)
-            #Create message
-        else:
-            # handle all other sockets
-            inputMsg = getMessage(s)
-            print("From while Client and in which Chat room  and what message")
-            # if not inputMsg:
-            #     s.close()
-            #     self.inputs.remove(s)
-            #     self.outputs.remove(s)
-            # else:
-            # self.client_queues[s].put(inputMsg)
-
-        for s in outputready:
-            if not self.client_queues[s].empty():
-                output = self.client_queues[s].get()
-                output = json.dumps(output)
-                self.sendMessage(s, output)
+            if s == sys.stdin:
+                # any input closes the serves. Does not work on Windows!
+                engMessage = sys.stdin.readline()
+                chatRoomId = input("Input Chat Room ID: ")
+                msgObj = Message(MessageType.SendMsgRoom, username, chatRoomId.strip(), engMessage.strip())
+                encode_send_message(msgObj)
+                #Create message
+            else: #It's about to receive a message
+                # handle all other sockets
+                inputMsg = getMessage()
+                if not inputMsg:
+                    print("Didn't receive any message")
+                else:
+                    msgObj = process_incomming_message(inputMsg)
+                    if msgObj.msg_type == MessageType.ListAllRooms or msgObj.msg_type == MessageType.ListMembersForRoom:
+                        break
+    return
 
 
-def encode_send_message(messageObj)
+def encode_send_message(messageObj):
     # x = input("Enter the message: ")
-    msg = json.dumps({"message": messageObj})  #sys.argv[3]
+    msg = json.dumps(messageObj.__dict__)  #sys.argv[3]
     pack = f"{len(msg):<{length_header}}" + msg
-    s.send(pack.encode('utf-8'))    #default encoding of str.encode is utf-8
+    pack = pack.encode('utf-8')
+    while len(pack):
+        transmittedBytes = s.send(pack)
+        pack = pack[transmittedBytes:]
 
-def getMessage(self, client):
+def getMessage():
     #"client" must be a socket object connected to a client
     length = ''
-    templen = self.length_header
-    while len(length) < self.length_header:
+    templen = length_header
+    while len(length) < length_header:
         buffer = ''
-        buffer = client.recv(templen).decode()
+        buffer = s.recv(templen).decode()
         if buffer == '':
             return False
         length += buffer
@@ -107,12 +95,49 @@ def getMessage(self, client):
     templen = intlength
     while len(msg) < intlength:
         buffer = ''
-        buffer = client.recv(templen).decode()
+        buffer = s.recv(templen).decode()
         if buffer == '':
             return False
         msg += buffer
         templen -= len(buffer)
     return msg
+
+def process_incomming_message(msg):
+    msgDict = json.loads(msg)
+    #Print the msg in the msg.
+    msgObj = Message(msgDict[0], msgDict[1], msgDict[2], msgDict[3])
+    if msgObj.msg_type == MessageType.SendMsgRoom:
+        print("From: ",msgObj.sender, "ChatRoom: ", msgObj.destination, "Msg: ", msgObj.message)
+    elif msgObj.msg_type == MessageType.ListAllRooms:
+        print("All rooms: ", msgObj.message)
+    elif msgObj.msg_type == MessageType.ListMembersForRoom:
+        print("All members: ", msgObj.message)
+    return msgObj
+
+def list_all_rooms():
+    msgObj = Message(MessageType.ListAllRooms, username, 0, "")
+    encode_send_message(msgObj)
+    send_receive_messages()
+
+def join_room():
+    roomId = input("Room name to join: ")
+    msgObj = Message(MessageType.JoinRoom, username, roomId.strip(), "")
+    encode_send_message(msgObj)
+
+def leave_room():
+    roomId = input("Room name to leave: ")
+    msgObj = Message(MessageType.LeaveRoom, username, roomId.strip(), "")
+    encode_send_message(msgObj)
+
+
+def list_all_members_room():
+    roomId = input("Room name for members list: ")
+    msgObj = Message(MessageType.LeaveRoom, username, roomId.strip(), "")
+    encode_send_message(msgObj)
+    send_receive_messages()
+
+def log_out():
+    s.close()
 
 # i = 0
 # data = s.recv(10000000)
@@ -123,23 +148,29 @@ def getMessage(self, client):
 
 choice_def = {
         1: create_a_room,
-        2: query2,
-        3: query3,
-        4: query4,
-        5: query5,
-        6: send_receive_chatRoomM,
-        7: query7,
+        2: list_all_rooms,
+        3: join_room,
+        4: leave_room,
+        5: list_all_members_room,
+        6: send_receive_messages,
+        7: log_out,
         # 8: query8,
         # 9: query9,
         # 10: query10,
     }
 
+def init_username():
+    global username
+    username = input("Input new username")
+    msgObj = Message(MessageType.InitUsername, s, 0, username)
+    encode_send_message(msgObj)
 
 
 if __name__ == '__main__':
 
     inputSocket.append(s)
     inputSocket.append(sys.stdin)
+    init_username()
     client_console(s)
 
 

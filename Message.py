@@ -8,6 +8,7 @@ class MessageType(enum.Enum):
     ListMembersForRoom = 5
     SendMsgRoom = 6
     CheckForARoom = 7
+    InitUsername = 8
 
 
 class Message:
@@ -15,7 +16,6 @@ class Message:
         self.msg_type = msg_type
         self.sender = sender
         self.destination = destination
-        # self.roomId = roomId
         self.message = message
 
 
