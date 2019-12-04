@@ -15,7 +15,7 @@ from Message import MessageType
 from Room import Room
 
 class ChatServer:
-    def __init__(self, host='', port=50000, backlog=5, length_header=100):
+    def __init__(self, host='', port=50001, backlog=5, length_header=100):
         self.host = host
         self.port = port
         self.backlog = backlog
@@ -76,34 +76,35 @@ class ChatServer:
 
     def handleMessage(self, requesting_socket, msg):
 
-        if msg.msg_type == MessageType.InitUsername:
+        if msg.msg_type == 8:
             self.clients[msg.sender] = requesting_socket
 
         elif msg.sender not in self.clients.keys():
             requesting_socket.close()
 
-        elif msg.msg_type == MessageType.CreateRoom:
+        elif msg.msg_type == 1:
             if msg.destination not in self.rooms:
-                self.rooms[msg.distination] = Room(msg.destination)
+                self.rooms[msg.destination] = Room(msg.destination)
+                self.rooms[msg.destination].addMember(msg.sender)
 
-        elif msg.msg_type == MessageType.ListAllRooms:
-            output_message = Message(2, "server", msg.sender, self.rooms.keys())
+        elif msg.msg_type == 2:
+            output_message = Message(2, "server", msg.sender, list(self.rooms.keys()))
             self.client_queues[requesting_socket].put(output_message)
             
-        elif msg.msg_type == MessageType.JoinRoom:
+        elif msg.msg_type == 3:
             if msg.destination in self.rooms.keys():
                 self.rooms[msg.destination].addMember(msg.sender)
 
-        elif msg.msg_type == MessageType.LeaveRoom:
+        elif msg.msg_type == 4:
             if msg.destination in self.rooms.keys():
                 self.rooms[msg.destination].removeMember(msg.sender)
 
-        elif msg.msg_type == MessageType.ListMembersForRoom:
+        elif msg.msg_type == 5:
             if msg.destination in self.rooms.keys():
                 output_message = Message(5, "server", msg.sender, self.rooms[msg.destination].members)
                 self.client_queues[requesting_socket].put(output_message)
 
-        elif msg.msg_type == MessageType.SendMsgRoom:
+        elif msg.msg_type == 6:
             if msg.destination in self.rooms.keys() and msg.sender in self.rooms[msg.destination].members:
                 self.room_broadcast(msg.destination, msg)
         else:
@@ -140,13 +141,12 @@ class ChatServer:
                         self.inputs.remove(s)
                         self.outputs.remove(s)
                     else:
-                        self.message_handler(s,inputMsg)
-                        self.client_queues[s].put(inputMsg)
+                        self.handleMessage(s,inputMsg)
+                        # self.client_queues[s].put(inputMsg)
 
             for s in outputready:
                 if not self.client_queues[s].empty():
-                    output = self.client_queues[s].get()
-                    output = json.dumps(output)
+                    output = self.client_queues[s].get()  # output = json.dumps(output.__dict__)
                     self.sendMessage(s, output)
 
         self.server.close()
