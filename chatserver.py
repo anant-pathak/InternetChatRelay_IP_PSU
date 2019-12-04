@@ -10,7 +10,9 @@ import socket
 import sys
 import json
 import queue
-import Message
+from Message import Message
+from Message import MessageType
+from Room import Room
 
 class ChatServer:
     def __init__(self, host='', port=50000, backlog=5, length_header=100):
@@ -49,40 +51,65 @@ class ChatServer:
                 return False 
             msg += buffer
             templen -= len(buffer)
-        return msg
+        msg = json.loads(msg)
+        msgObject = Message(msg['msg_type'], msg['sender'], msg['destination'], msg['message'])
+        return msgObject
 
-    def sendMessage(self, client, message):
+    def sendMessage(self, client_socket, message):
         #this will need to be adapted to pass a message object to it instead of a string
         #which will be pretty easy once I see the message class
+        message = json.dumps(message.__dict__)
         message = f"{len(message):<{self.length_header}}" + message
         message = message.encode()
         while len(message):
-            transmit = client.send(message)
-            message = message[transmit:]
+            transmitted = client_socket.send(message)
+            message = message[transmitted:]
             
-    def broadcast(self, msg):
+    def room_broadcast(self, room, msg):
+        self.rooms[room].addMessage(msg)
         for x in self.rooms[msg.destination].members:
-            self.client_queues[self.clients[x]]
+            self.client_queues[self.clients[x]].put(msg)
+    
+    def all_broadcast(self, msg):
+        for val in self.client_queues.values():
+            val.put(msg)
 
-    def handleMessage(self, msg):
-        #there are obviously a few more message types we will need but I just wrote out a few
-        if msg.msg_type == 1:
+    def handleMessage(self, requesting_socket, msg):
+
+        if msg.msg_type == MessageType.InitUsername:
+            self.clients[msg.sender] = requesting_socket
+
+        elif msg.sender not in self.clients.keys():
+            requesting_socket.close()
+
+        elif msg.msg_type == MessageType.CreateRoom:
+            if msg.destination not in self.rooms:
+                self.rooms[msg.distination] = Room(msg.destination)
+
+        elif msg.msg_type == MessageType.ListAllRooms:
+            output_message = Message(2, "server", msg.sender, self.rooms.keys())
+            self.client_queues[requesting_socket].put(output_message)
+            
+        elif msg.msg_type == MessageType.JoinRoom:
+            if msg.destination in self.rooms.keys():
+                self.rooms[msg.destination].addMember(msg.sender)
+
+        elif msg.msg_type == MessageType.LeaveRoom:
+            if msg.destination in self.rooms.keys():
+                self.rooms[msg.destination].removeMember(msg.sender)
+
+        elif msg.msg_type == MessageType.ListMembersForRoom:
+            if msg.destination in self.rooms.keys():
+                output_message = Message(5, "server", msg.sender, self.rooms[msg.destination].members)
+                self.client_queues[requesting_socket].put(output_message)
+
+        elif msg.msg_type == MessageType.SendMsgRoom:
+            if msg.destination in self.rooms.keys() and msg.sender in self.rooms[msg.destination].members:
+                self.room_broadcast(msg.destination, msg)
+        else:
             pass
-            #initial message containing username
-        elif msg.msg_type == 2:
-            pass
-            #private message
-        elif msg.msg_type == 3:
-            pass
-            #room message
-            self.rooms[msg.destination].addMessage(msg)
-            self.broadcast(msg)
-        elif msg.msg_type == 4:
-            pass
+        
            #create room
-        elif msg.msg_type == 5:
-            pass
-            #cre
 
     def runServer(self):
         running = 1
@@ -113,6 +140,7 @@ class ChatServer:
                         self.inputs.remove(s)
                         self.outputs.remove(s)
                     else:
+                        self.message_handler(s,inputMsg)
                         self.client_queues[s].put(inputMsg)
 
             for s in outputready:

@@ -11,6 +11,12 @@ class Room:
     def addMessage(self, Message):
         self.messages.append(Message)
     
+    def addMember(self, member):
+        self.members.append(member)
+    
+    def removeMember(self, member):
+        self.members.remove(member)
+    
     def returnDict(self):
         dict = copy.deepcopy(self.__dict__)
         dict['messages'] = []
