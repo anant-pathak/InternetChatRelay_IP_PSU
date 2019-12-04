@@ -13,7 +13,7 @@ import queue
 import Message
 
 class ChatServer:
-    def __init__(self, host='', port=50000, backlog=5, length_header=100):
+    def __init__(self, host='localhost', port=50000, backlog=5, length_header=100):
         self.host = host
         self.port = port
         self.backlog = backlog
@@ -22,7 +22,7 @@ class ChatServer:
         self.server.bind((host,port))
         self.server.setblocking(0)
         self.server.listen(backlog)
-        self.inputs = [self.server,sys.stdin]
+        self.inputs = [self.server, sys.stdin]
         self.outputs = []
         self.client_queues = {} #index of cleint queues by socket object -> client queue
         self.rooms = {} #index of rooms by room name -> room object
@@ -89,7 +89,8 @@ class ChatServer:
         while running:
             inputready,outputready,exceptready = select.select(self.inputs, self.outputs, self.inputs, 0.1)
             #print(inputready)
-            #print(outputready)
+
+
             for s in inputready:
                 if s == self.server:
                     # handle the server socket
