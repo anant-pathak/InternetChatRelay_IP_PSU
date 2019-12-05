@@ -68,7 +68,9 @@ def client_console(s):
         if not x.isnumeric():
             print("Plz enter only the number in range")
             continue
-        choice_def[int(x)](int(x))
+        remainActive = choice_def[int(x)](int(x))
+        if remainActive == False:
+            break
         if x.isnumeric() and int(x) == 7:
             break
         x1 = input("Show menu: Y / N :")
@@ -79,10 +81,14 @@ def client_console(s):
 
 
 def create_a_room(choice):
-    chatRoomId = input("Enter chat room id")
-    chatRoomId = chatRoomId.strip()
-    msgObj = Message(1, username, chatRoomId, "")
-    encode_send_message(msgObj)
+    try:
+        chatRoomId = input("Enter chat room id")
+        chatRoomId = chatRoomId.strip()
+        msgObj = Message(1, username, chatRoomId, "")
+        encode_send_message(msgObj)
+    except:
+        return False
+
 
 def send_receive_messages(choice):
     if choice == 6:
@@ -106,7 +112,10 @@ def send_receive_messages(choice):
                 # handle all other sockets
                 inputMsg = getMessage()
                 if not inputMsg:
-                    print("Didn't receive any message")
+                    print("Didn't receive any message, quitting")
+                    log_out(7)
+                    running = False
+                    return False
                 else:
                     msgObj = process_incomming_message(inputMsg)
                     # if msgObj.msg_type == 2 or msgObj.msg_type == 5:
@@ -163,29 +172,43 @@ def process_incomming_message(msg):
     return msgObj
 
 def list_all_rooms(choice):
-    msgObj = Message(2, username, 0, "")
-    encode_send_message(msgObj)
-    send_receive_messages(choice)
+    try:
+        msgObj = Message(2, username, 0, "")
+        encode_send_message(msgObj)
+        send_receive_messages(choice)
+    except:
+        return False
 
 def join_room(choice):
-    roomId = input("Room name to join: ")
-    msgObj = Message(3, username, roomId.strip(), "")
-    encode_send_message(msgObj)
+    try:
+        roomId = input("Room name to join: ")
+        msgObj = Message(3, username, roomId.strip(), "")
+        encode_send_message(msgObj)
+    except:
+        return False
 
 def leave_room(choice):
-    roomId = input("Room name to leave: ")
-    msgObj = Message(4, username, roomId.strip(), "")
-    encode_send_message(msgObj)
-
+    try:
+        roomId = input("Room name to leave: ")
+        msgObj = Message(4, username, roomId.strip(), "")
+        encode_send_message(msgObj)
+    except:
+        return False
 
 def list_all_members_room(choice):
-    roomId = input("Room name for members list: ")
-    msgObj = Message(5, username, roomId.strip(), "")
-    encode_send_message(msgObj)
-    send_receive_messages(choice)
+    try:
+        roomId = input("Room name for members list: ")
+        msgObj = Message(5, username, roomId.strip(), "")
+        encode_send_message(msgObj)
+        send_receive_messages(choice)
+    except:
+        return False
 
 def log_out(choice):
-    s.close()
+    try:
+        s.close()
+    except:
+        return False
 
 # i = 0
 # data = s.recv(10000000)
