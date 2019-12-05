@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 """
-An echo server that uses select to handle multiple clients at a time.
-Entering any line of input at the terminal will exit the server.
+A TCP Socket Chat Server
+By Michael Samuels and Anant Pathak
 """
 
 import select
@@ -77,36 +77,71 @@ class ChatServer:
     def handleMessage(self, requesting_socket, msg):
 
         if msg.msg_type == 8:
-            self.clients[msg.sender] = requesting_socket
+            if msg.sender not in self.clients:
+                self.clients[msg.sender] = requesting_socket
+            else:
+                self.sendMessage(requesting_socket, Message(1, 'server', msg.sender, f'Username {msg.sender} already exists'))
+                requesting_socket.close()
+                self.inputs.remove(requesting_socket)
+                self.outputs.remove(requesting_socket)
+                del self.client_queues[requesting_socket]
 
         elif msg.sender not in self.clients.keys():
             requesting_socket.close()
 
         elif msg.msg_type == 1:
+            #create room
             if msg.destination not in self.rooms:
                 self.rooms[msg.destination] = Room(msg.destination)
                 self.rooms[msg.destination].addMember(msg.sender)
+                output_message = Message(1, "server", msg.sender, f"Room {msg.destination} created")
+                self.all_broadcast(output_message)
+            else:
+                output_message = Message(1, "server", msg.sender, f"Room {msg.destination} already exists")
+                self.client_queues[requesting_socket].put(output_message)
 
         elif msg.msg_type == 2:
+            #list rooms
             output_message = Message(2, "server", msg.sender, list(self.rooms.keys()))
             self.client_queues[requesting_socket].put(output_message)
             
         elif msg.msg_type == 3:
+            #join room
             if msg.destination in self.rooms.keys():
                 self.rooms[msg.destination].addMember(msg.sender)
+                output_message1 = Message(3, "server", msg.sender, self.rooms[msg.destination].returnDict())
+                self.room_broadcast(msg.destination, output_message1)
+                output_message2 = Message(3, "server", msg.sender, f"{msg.sender} joined room {msg.destination}")
+                self.room_broadcast(msg.destination, output_message2)
+            else:
+                output_message = Message(3, "server", msg.sender, f"Cannot join room {msg.destination}, because it does not exist")
+                self.client_queues[requesting_socket].put(output_message)
 
         elif msg.msg_type == 4:
+            #leave room
             if msg.destination in self.rooms.keys():
                 self.rooms[msg.destination].removeMember(msg.sender)
+                output_message = Message(3, "server", msg.sender, f"{msg.sender} left room {msg.destination}")
+                self.room_broadcast(msg.destination, output_message)
+            else:
+                output_message = Message(4, "server", msg.sender, f"Cannot leave room {msg.destination}, because it does not exist")
+                self.client_queues[requesting_socket].put(output_message)
 
         elif msg.msg_type == 5:
+            #list members for a room
             if msg.destination in self.rooms.keys():
                 output_message = Message(5, "server", msg.sender, self.rooms[msg.destination].members)
+                self.client_queues[requesting_socket].put(output_message)
+            else:
+                output_message = Message(5, "server", msg.sender, f"Cannot provide member list for {msg.destination}, because it does not exist")
                 self.client_queues[requesting_socket].put(output_message)
 
         elif msg.msg_type == 6:
             if msg.destination in self.rooms.keys() and msg.sender in self.rooms[msg.destination].members:
                 self.room_broadcast(msg.destination, msg)
+            else:
+                output_message = Message(3, "server", msg.sender, f"Cannot send message to {msg.destination}, because it does not exist")
+                self.client_queues[requesting_socket].put(output_message)
         else:
             pass
         
