@@ -77,6 +77,7 @@ def create_a_room():
     encode_send_message(msgObj)
 
 def send_receive_messages():
+    print("enter 'Q' to quit chat and go back to main menu. ")
     running = True
     while running:
         inputready, outputready, exceptready = select.select(inputSocket, outputSocket, inputSocket, 0.1)
@@ -84,6 +85,10 @@ def send_receive_messages():
             if s == sys.stdin:
                 # any input closes the serves. Does not work on Windows!
                 engMessage = sys.stdin.readline()
+                engMessage = engMessage.rstrip()
+                if engMessage == 'Q':
+                    running = False
+                    break
                 chatRoomId = input("Input Chat Room ID: ")
                 msgObj = Message(6, username, chatRoomId.strip(), engMessage.strip())
                 encode_send_message(msgObj)
@@ -95,7 +100,10 @@ def send_receive_messages():
                     print("Didn't receive any message")
                 else:
                     msgObj = process_incomming_message(inputMsg)
-                    if msgObj.msg_type == 2 or msgObj.msg_type == 5:
+                    # if msgObj.msg_type == 2 or msgObj.msg_type == 5:
+                    #     running = False
+                    #     break
+                    if msgObj.msg_type != 6:
                         running = False
                         break
     return

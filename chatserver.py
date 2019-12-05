@@ -50,11 +50,14 @@ class ChatServer:
         templen = intlength
         while len(msg) < intlength:
             buffer = ''
-            buffer = client.recv(templen).decode()
-            if buffer == '':
-                return False 
-            msg += buffer
-            templen -= len(buffer)
+            try:
+                buffer = client.recv(templen).decode()
+                if buffer == '':
+                    return False
+                msg += buffer
+                templen -= len(buffer)
+            except:
+                return False
         msg = json.loads(msg)
         msgObject = Message(msg['msg_type'], msg['sender'], msg['destination'], msg['message'])
         print(msgObject.__dict__)
@@ -131,7 +134,7 @@ class ChatServer:
 
         elif msg.msg_type == 4:
             #leave room
-            if msg.destination in self.rooms.keys():
+            if msg.destination in self.rooms.keys() and msg.sender in  self.rooms[msg.destination].members:
                 self.rooms[msg.destination].removeMember(msg.sender)
                 #output_message = Message(3, "server", msg.sender, f"{msg.sender} left room {msg.destination}")
                 #self.room_broadcast(msg.destination, output_message)
