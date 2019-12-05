@@ -26,9 +26,10 @@ class ChatServer:
         self.server.listen(backlog)
         self.inputs = [self.server,sys.stdin]
         self.outputs = []
-        self.client_queues = {} #index of cleint queues by socket object -> client queue
+        self.client_queues = {} #index of client queues by socket object -> client queue
         self.rooms = {} #index of rooms by room name -> room object
         self.clients = {} #index of client by client username -> socket object
+        self.socket_to_user = {} #index of client queues by socket object -> client queue
 
     def getMessage(self, client):
         #"client" must be a socket object connected to a client
@@ -36,11 +37,14 @@ class ChatServer:
         templen = self.length_header
         while len(length) < self.length_header:
             buffer = ''
-            buffer = client.recv(templen).decode()
-            if buffer == '':
-                return False 
-            length += buffer
-            templen -= len(buffer)
+            try:
+                buffer = client.recv(templen)
+                if not len(buffer):
+                    return False 
+                length += buffer.decode()
+                templen -= len(buffer)
+            except:
+                return False
         intlength = int(length.strip())
         msg = ''       
         templen = intlength
@@ -53,6 +57,7 @@ class ChatServer:
             templen -= len(buffer)
         msg = json.loads(msg)
         msgObject = Message(msg['msg_type'], msg['sender'], msg['destination'], msg['message'])
+        print(msgObject.__dict__)
         return msgObject
 
     def sendMessage(self, client_socket, message):
@@ -67,7 +72,10 @@ class ChatServer:
             
     def room_broadcast(self, room, msg):
         self.rooms[room].addMessage(msg)
-        for x in self.rooms[msg.destination].members:
+        print(self.rooms[room].messages)
+        print(msg.destination)
+        print(self.rooms[room].members)
+        for x in self.rooms[room].members:
             self.client_queues[self.clients[x]].put(msg)
     
     def all_broadcast(self, msg):
@@ -79,8 +87,12 @@ class ChatServer:
         if msg.msg_type == 8:
             if msg.sender not in self.clients:
                 self.clients[msg.sender] = requesting_socket
+                self.socket_to_user[requesting_socket] = msg.sender
+                #print(self.clients)
+                #print(self.client_queues)
+                print(self.rooms)
             else:
-                self.sendMessage(requesting_socket, Message(1, 'server', msg.sender, f'Username {msg.sender} already exists'))
+                #self.sendMessage(requesting_socket, Message(1, 'server', msg.sender, f'Username {msg.sender} already exists'))
                 requesting_socket.close()
                 self.inputs.remove(requesting_socket)
                 self.outputs.remove(requesting_socket)
@@ -94,11 +106,11 @@ class ChatServer:
             if msg.destination not in self.rooms:
                 self.rooms[msg.destination] = Room(msg.destination)
                 self.rooms[msg.destination].addMember(msg.sender)
-                output_message = Message(1, "server", msg.sender, f"Room {msg.destination} created")
-                self.all_broadcast(output_message)
-            else:
-                output_message = Message(1, "server", msg.sender, f"Room {msg.destination} already exists")
-                self.client_queues[requesting_socket].put(output_message)
+                #output_message = Message(1, "server", msg.sender, f"Room {msg.destination} created")
+                #self.all_broadcast(output_message)
+            #else:
+                #output_message = Message(1, "server", msg.sender, f"Room {msg.destination} already exists")
+                #self.client_queues[requesting_socket].put(output_message)
 
         elif msg.msg_type == 2:
             #list rooms
@@ -109,39 +121,39 @@ class ChatServer:
             #join room
             if msg.destination in self.rooms.keys():
                 self.rooms[msg.destination].addMember(msg.sender)
-                output_message1 = Message(3, "server", msg.sender, self.rooms[msg.destination].returnDict())
-                self.room_broadcast(msg.destination, output_message1)
-                output_message2 = Message(3, "server", msg.sender, f"{msg.sender} joined room {msg.destination}")
-                self.room_broadcast(msg.destination, output_message2)
-            else:
-                output_message = Message(3, "server", msg.sender, f"Cannot join room {msg.destination}, because it does not exist")
-                self.client_queues[requesting_socket].put(output_message)
+                #output_message1 = Message(3, "server", msg.sender, self.rooms[msg.destination].returnDict())
+                #self.room_broadcast(msg.destination, output_message1)
+                #output_message2 = Message(3, "server", msg.sender, f"{msg.sender} joined room {msg.destination}")
+                #self.room_broadcast(msg.destination, output_message2)
+            #else:
+                #output_message = Message(3, "server", msg.sender, f"Cannot join room {msg.destination}, because it does not exist")
+                #self.client_queues[requesting_socket].put(output_message)
 
         elif msg.msg_type == 4:
             #leave room
             if msg.destination in self.rooms.keys():
                 self.rooms[msg.destination].removeMember(msg.sender)
-                output_message = Message(3, "server", msg.sender, f"{msg.sender} left room {msg.destination}")
-                self.room_broadcast(msg.destination, output_message)
-            else:
-                output_message = Message(4, "server", msg.sender, f"Cannot leave room {msg.destination}, because it does not exist")
-                self.client_queues[requesting_socket].put(output_message)
+                #output_message = Message(3, "server", msg.sender, f"{msg.sender} left room {msg.destination}")
+                #self.room_broadcast(msg.destination, output_message)
+            #else:
+            #    output_message = Message(4, "server", msg.sender, f"Cannot leave room {msg.destination}, because it does not exist")
+            #    self.client_queues[requesting_socket].put(output_message)
 
         elif msg.msg_type == 5:
             #list members for a room
             if msg.destination in self.rooms.keys():
                 output_message = Message(5, "server", msg.sender, self.rooms[msg.destination].members)
                 self.client_queues[requesting_socket].put(output_message)
-            else:
-                output_message = Message(5, "server", msg.sender, f"Cannot provide member list for {msg.destination}, because it does not exist")
-                self.client_queues[requesting_socket].put(output_message)
+            #else:
+            #    output_message = Message(5, "server", msg.sender, f"Cannot provide member list for {msg.destination}, because it does not exist")
+            #    self.client_queues[requesting_socket].put(output_message)
 
         elif msg.msg_type == 6:
             if msg.destination in self.rooms.keys() and msg.sender in self.rooms[msg.destination].members:
                 self.room_broadcast(msg.destination, msg)
-            else:
-                output_message = Message(3, "server", msg.sender, f"Cannot send message to {msg.destination}, because it does not exist")
-                self.client_queues[requesting_socket].put(output_message)
+            #else:
+            #    output_message = Message(3, "server", msg.sender, f"Cannot send message to {msg.destination}, because it does not exist")
+            #    self.client_queues[requesting_socket].put(output_message)
         else:
             pass
         
@@ -175,6 +187,10 @@ class ChatServer:
                         s.close()
                         self.inputs.remove(s)
                         self.outputs.remove(s)
+                        outputready.remove(s)
+                        del self.clients[self.socket_to_user[s]]
+                        del self.socket_to_user[s]
+                        del self.client_queues[s]
                     else:
                         self.handleMessage(s,inputMsg)
                         # self.client_queues[s].put(inputMsg)
