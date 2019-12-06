@@ -233,7 +233,7 @@ choice_def = {
 def init_username():
     global username
     username = input("Input new username")
-    msgObj = Message(8, username, 0, "")
+    msgObj = Message(0, username, 0, "")
     #str(MessageType.InitUsername)
     encode_send_message(msgObj)
 

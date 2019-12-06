@@ -87,7 +87,7 @@ class ChatServer:
 
     def handleMessage(self, requesting_socket, msg):
 
-        if msg.msg_type == 8:
+        if msg.msg_type == 0:
             if msg.sender not in self.clients:
                 self.clients[msg.sender] = requesting_socket
                 self.socket_to_user[requesting_socket] = msg.sender

@@ -1,6 +1,7 @@
 import enum
 
 class MessageType(enum.Enum):
+    InitUsername = 0
     CreateRoom = 1
     ListAllRooms = 2
     JoinRoom = 3
@@ -8,7 +9,7 @@ class MessageType(enum.Enum):
     ListMembersForRoom = 5
     SendMsgRoom = 6
     CheckForARoom = 7
-    InitUsername = 8
+
 
 
 class Message:
